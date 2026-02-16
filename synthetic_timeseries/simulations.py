@@ -472,7 +472,7 @@ class CLSimulator(Simulator):
             - Defines the shape of the phase lag spectrum used. 
             - If ommited, no phase lag spectrum is simulated.
             - If string, model defined in `stingray.simulator.models`
-            - If float, is a constant value in [-\pi,\pi]
+            - If float, is a constant value in [-π,π]
             - If `astropy.modeling.Model`, lag spectrum takes shape of model.
             - If other callable, has signature f(frequency)->lag.
             - If iterable, must be lag at each frequency in self.get_refftfreq()
@@ -514,14 +514,15 @@ class CLSimulator(Simulator):
         elif isinstance(pds1, str):
             from stingray.simulator import models
 
-            if pds1 not in dir(models):
+            if not hasattr(models, pds1):
                 raise ValueError('Model string not defined')
-            
+
             if isinstance(params, dict):
-                model = eval("models." + pds1 + "(**params)") # This is how Stingray does it
+                model = getattr(models, pds1)(**params)
                 pds_shape1 = model(w)
             elif isinstance(params,list):
-                pds_shape1 = eval("models." + pds1 + "(w, params)")
+                model_func = getattr(models, pds1)
+                pds_shape1 = model_func(w, params)
             else:
                 raise ValueError("Params should be list or dictionary!")
 
@@ -535,14 +536,15 @@ class CLSimulator(Simulator):
         elif isinstance(pds2, str):
             from stingray.simulator import models
 
-            if pds2 not in dir(models):
+            if not hasattr(models, pds2):
                 raise ValueError('Model string not defined')
-            
+
             if isinstance(params, dict):
-                model = eval("models." + pds2 + "(**params)")
+                model = getattr(models, pds2)(**params)
                 pds_shape2 = model(w)
             elif isinstance(params,list):
-                pds_shape2 = eval("models." + pds2 + "(w, params)")
+                model_func = getattr(models, pds2)
+                pds_shape2 = model_func(w, params)
             else:
                 raise ValueError("Params should be list or dictionary!")
 
