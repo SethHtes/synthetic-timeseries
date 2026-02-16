@@ -9,8 +9,8 @@ A Python library for simulating synthetic X-ray time series (light curves) with 
 git clone https://github.com/sethlarner/synthetic-timeseries.git
 cd synthetic-timeseries
 
-# Install in editable mode
-pip install -e .
+# Install
+pip install .
 ```
 
 ## Quick Start
@@ -204,7 +204,7 @@ For more control, you can use the underlying functions directly:
 
 ### TK_simulate()
 
-Unified function that handles all coherence and phase lag simulation cases. This replaces the previous separate functions (`TK_coh_and_lag`, `TK_coherence`, and `TK_phaselag`).
+Unified function that handles all coherence and phase lag simulation cases.
 
 ```python
 from synthetic_timeseries.simulations import TK_simulate, make_powerlaw_pds
@@ -372,7 +372,3 @@ cs = AveragedCrossspectrum.from_lightcurve(lc_soft, lc_hard, segment_size=10.0)
 lag, lag_err = cs.phase_lag()
 print(f"Measured phase lag: {lag}")
 ```
-
-## License
-
-This code is research software. Please cite Larner, Nowak, & Wilms (2026) if you use it in published work.
