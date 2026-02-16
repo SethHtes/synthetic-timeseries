@@ -202,12 +202,12 @@ lc1, lc2 = sim.CL_simulate(pds1=2.0, pds2=2.0, lag=0.5, coh=0.8)
 
 For more control, you can use the underlying functions directly:
 
-### TK_coh_and_lag()
+### TK_simulate()
 
-Most general function supporting arbitrary coherence and phase lag.
+Unified function that handles all coherence and phase lag simulation cases. This replaces the previous separate functions (`TK_coh_and_lag`, `TK_coherence`, and `TK_phaselag`).
 
 ```python
-from simulations import TK_coh_and_lag, make_powerlaw_pds
+from synthetic_timeseries.simulations import TK_simulate, make_powerlaw_pds
 import numpy as np
 
 # Create power spectrum
@@ -215,61 +215,96 @@ dt = 0.01
 N = 10000
 P1 = make_powerlaw_pds(index=2.0, dt=dt, bins=N)
 
-# Create coherence and lag spectra
+# Case 1: Both coherence and phase lag
 freq = np.fft.rfftfreq(N, d=dt)[1:]
 gamma = np.ones_like(P1) * 0.8  # Constant coherence
 lag = np.ones_like(P1) * 0.5    # Constant phase lag
 
-# Simulate
-counts1, counts2 = TK_coh_and_lag(
+counts1, counts2 = TK_simulate(
     P1=P1,
     P2=P1,
     output_length=N*dt,
     dt=dt,
     mean=100,
-    lag=lag,
-    gamma=gamma,
+    lag=lag,      # Phase lag spectrum
+    gamma=gamma,  # Coherence spectrum (γ²)
     rms=0.3
 )
-```
 
-### TK_coherence()
-
-Special case with coherence but no phase lag (φ=0).
-
-```python
-from simulations import TK_coherence, make_powerlaw_pds
-
-P1 = make_powerlaw_pds(index=2.0, dt=0.01, bins=10000)
-
-counts1, counts2 = TK_coherence(
+# Case 2: Coherence only (no phase lag)
+counts1, counts2 = TK_simulate(
     P1=P1,
     output_length=100,
     dt=0.01,
     mean=100,
     gamma=0.8,  # Can be float or array
     rms=0.3
+    # lag omitted or set to None/0 for no phase lag
 )
-```
 
-### TK_phaselag()
-
-Special case with phase lag but perfect coherence (γ²=1).
-
-```python
-from simulations import TK_phaselag, make_powerlaw_pds
-
-pds = make_powerlaw_pds(index=2.0, dt=0.01, bins=10000)
-
-counts1, counts2 = TK_phaselag(
-    pds=pds,
+# Case 3: Phase lag only (perfect coherence)
+counts1, counts2 = TK_simulate(
+    P1=P1,
     output_length=100,
     dt=0.01,
     mean=100,
     lag=0.5,  # Can be float or array
     rms=0.3
+    # gamma omitted or set to None/1.0 for perfect coherence
 )
 ```
+
+**Parameters:**
+- **P1** (np.ndarray): Power spectrum of reference time series
+- **output_length** (float): Length of output lightcurve in seconds
+- **dt** (float): Time resolution in seconds
+- **mean** (float or tuple): Mean count rate(s) in counts/sec
+- **lag** (float or np.ndarray, optional): Phase lag in radians [-π, π]. Default: 0
+- **gamma** (float or np.ndarray, optional): Coherence (γ²) in [0, 1]. Default: 1.0
+- **red_noise** (int, optional): Red noise factor. Default: 1
+- **rms** (float or tuple, optional): Fractional RMS variability. Default: 0.1
+- **P2** (np.ndarray, optional): Power spectrum of dependent time series. Default: P1
+- **poisson** (bool, optional): Apply Poisson noise. Default: False
+
+**Returns:**
+- **counts1, counts2** (tuple of np.ndarray): Two correlated time series
+
+### Helper Functions
+
+#### compute_transfer_function()
+
+Computes the complex transfer function from coherence and phase lag (Equation 15).
+
+```python
+from synthetic_timeseries.simulations import compute_transfer_function
+
+# T = sqrt(P_Y * γ² / P_X) * exp(i*φ)
+T = compute_transfer_function(gamma2=0.8, phi=0.5, P_X=P1, P_Y=P2)
+```
+
+#### compute_normalization_constant()
+
+Computes the normalization constant for the incoherent component (Equation 12).
+
+```python
+from synthetic_timeseries.simulations import compute_normalization_constant
+
+# K = sqrt((P_Y - P_X*|T|²) / 2)
+K = compute_normalization_constant(P_X=P1, P_Y=P2, T=T)
+```
+
+#### compute_theoretical_std()
+
+Computes theoretical standard deviation from power spectrum using Parseval's theorem.
+
+```python
+from synthetic_timeseries.simulations import compute_theoretical_std
+
+# Calculate expected std for a time series with given power spectrum
+std = compute_theoretical_std(P=power_spectrum, N=num_bins)
+```
+
+This is used internally to preserve cross-spectral phase relationships when coherence < 1.
 
 ## Analyzing Results
 
@@ -289,63 +324,6 @@ print(f"Phase lag: {lag}")
 print(f"Coherence: {coherence}")
 ```
 
-## Understanding the Output
-
-### Coherence (γ²)
-- Range: 0 to 1
-- γ² = 0: No correlation between time series
-- γ² = 1: Perfect correlation
-- Measures the fraction of power in lc2 that is linearly correlated with lc1
-
-### Phase Lag (φ)
-- Range: -π to π radians
-- φ > 0: lc2 lags behind lc1 (lc1 leads)
-- φ < 0: lc2 leads lc1
-- φ = 0: No time delay (in phase)
-- Related to time delay: Δt = φ / (2πf) at frequency f
-
-### Power Spectrum
-- Describes the power distribution across frequencies
-- Units depend on normalization (typically rms²/Hz)
-- Power law index α: P(f) ∝ f⁻ᵅ
-  - α = 0: White noise
-  - α = 1: Pink/flicker noise
-  - α = 2: Red/Brownian noise
-
-## Technical Notes
-
-### Important Implementation Details
-
-1. **Coherence is γ² (squared)**: The `coh` and `gamma` parameters expect coherence squared, not coherence amplitude.
-
-2. **Theoretical vs Empirical Normalization**: The code uses theoretical standard deviation (computed from the power spectrum via Parseval's theorem) rather than empirical std. This is critical for preserving cross-spectral phase relationships when coherence < 1.
-
-3. **Red Noise Limitation**: The `red_noise` parameter must equal 1 for coherence/lag simulations (not yet implemented for red_noise > 1).
-
-4. **Frequency Array**: Use `sim.get_refftfreq()` to get the frequency array corresponding to the power spectrum.
-
-### Mathematical Background
-
-The method implements Equations 9, 10, 12, and 15 from Larner, Nowak, & Wilms (2026):
-
-1. Reference transform: X = √(P_X/2) × (A_r + iB_r)
-2. Transfer function: T = √(P_Y×γ²/P_X) × exp(iφ)
-3. Normalization: K = √((P_Y - P_X×|T|²)/2)
-4. Dependent transform: Y = K×(H_r + iJ_r) + T×X
-
-where A_r, B_r, H_r, J_r are independent standard normal random variables.
-
-## Common Issues
-
-### Issue: Coherence drops below target when phase lag is present
-**Solution**: This is fixed in the current implementation using theoretical normalization. If you see this, ensure you're using the latest version of the code.
-
-### Issue: Red noise simulation fails
-**Error**: `NotImplementedError: Red noise > 1 is not implemented`
-**Solution**: Set `red_noise=1` in CLSimulator initialization.
-
-### Issue: Irregular results with segment_size
-**Note**: The `segment_size` parameter is experimental and has known issues. Use with caution.
 
 ## Citation
 
