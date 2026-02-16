@@ -12,6 +12,7 @@ __email__ = "larner@wustl.edu"
 
 from .simulations import (
     CLSimulator,
+    TK_simulate,
     TK_coh_and_lag,
     TK_coherence,
     TK_phaselag,
@@ -23,18 +24,12 @@ from .simulations import (
     extract_and_scale,
 )
 
-from .plotting import (
-    plot_coh_and_lag,
-    plot_simulated_lag,
-    plot_coh_lag_deviations,
-    make_cs,
-    make_ps,
-)
-
 __all__ = [
     # Main simulator class
     "CLSimulator",
     # High-level simulation functions
+    "TK_simulate",
+    # Deprecated aliases
     "TK_coh_and_lag",
     "TK_coherence",
     "TK_phaselag",
@@ -46,10 +41,4 @@ __all__ = [
     # Low-level utilities
     "invert_fft",
     "extract_and_scale",
-    # Plotting functions
-    "plot_coh_and_lag",
-    "plot_simulated_lag",
-    "plot_coh_lag_deviations",
-    "make_cs",
-    "make_ps",
 ]

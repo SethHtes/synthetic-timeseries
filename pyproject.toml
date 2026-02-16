@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synthetic-timeseries"
+version = "0.1.0"
+description = "Simulate synthetic time series with arbitrary coherence and phase lag using the Timmer-Koenig method"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Seth R. Larner", email = "larner@wustl.edu"}
+]
+
+dependencies = [
+    "numpy>=1.20.0",
+    "astropy>=4.0",
+    "stingray>=1.0",
+    "typing-extensions>=4.0.0",
+    "tqdm>=4.60.0",
+]
+
+[tool.setuptools]
+packages = ["synthetic_timeseries"]
