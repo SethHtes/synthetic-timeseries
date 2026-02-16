@@ -13,9 +13,6 @@ __email__ = "larner@wustl.edu"
 from .simulations import (
     CLSimulator,
     TK_simulate,
-    TK_coh_and_lag,
-    TK_coherence,
-    TK_phaselag,
     compute_transfer_function,
     compute_normalization_constant,
     compute_theoretical_std,
@@ -29,10 +26,6 @@ __all__ = [
     "CLSimulator",
     # High-level simulation functions
     "TK_simulate",
-    # Deprecated aliases
-    "TK_coh_and_lag",
-    "TK_coherence",
-    "TK_phaselag",
     # Mathematical utilities
     "compute_transfer_function",
     "compute_normalization_constant",
