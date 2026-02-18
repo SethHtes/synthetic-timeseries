@@ -89,6 +89,35 @@ def compute_normalization_constant(P_X: Union[float, np.ndarray[float]],
     # Clamp to zero to avoid NaN from floating-point rounding when gamma=1
     return np.sqrt(np.maximum(P_Y - P_X * T_mag_squared, 0.0) / 2)
 
+def cross_spectra_to_coh_lag(cospec: Union[float, np.ndarray],
+                             quadspec: Union[float, np.ndarray],
+                             P_X: Union[float, np.ndarray],
+                             P_Y: Union[float, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
+    '''Convert co-spectrum and quadrature spectrum to coherence and phase lag.
+
+    Parameters:
+    -----------
+    cospec : float | np.ndarray
+        Real part of the cross spectrum, Re[C]
+    quadspec : float | np.ndarray
+        Imaginary part of the cross spectrum, Im[C]
+    P_X : float | np.ndarray
+        Power spectrum of the reference time series
+    P_Y : float | np.ndarray
+        Power spectrum of the dependent time series
+
+    Returns:
+    --------
+    gamma2 : np.ndarray
+        Coherence squared, γ² = (Re[C]² + Im[C]²) / (P_X * P_Y)
+    phi : np.ndarray
+        Phase lag in radians, φ = arctan2(Im[C], Re[C])
+    '''
+    gamma2 = (cospec**2 + quadspec**2) / (P_X * P_Y)
+    phi = np.arctan2(quadspec, cospec)
+    return gamma2, phi
+
+
 def make_powerlaw_pds(index:float,dt:float,bins:int)->np.ndarray[float]:
     w = np.fft.rfftfreq(bins, d=dt)[1:]
 
@@ -222,7 +251,9 @@ def TK_simulate(P1:np.ndarray,
                 red_noise:Optional[int] = 1,
                 rms:Optional[Union[float,Tuple[float,float]]] = 0.1,
                 P2:Optional[np.ndarray]=None,
-                poisson: bool = False)->Tuple[np.ndarray[float],np.ndarray[float]]:
+                poisson: bool = False,
+                cospec:Optional[Union[float,np.ndarray[float]]] = None,
+                quadspec:Optional[Union[float,np.ndarray[float]]] = None)->Tuple[np.ndarray[float],np.ndarray[float]]:
 
     '''Simulate two correlated time series with arbitrary coherence and phase lag.
 
@@ -269,6 +300,16 @@ def TK_simulate(P1:np.ndarray,
         If None, P2 = P1. Must have same shape as P1 if provided.
     poisson : bool, optional
         If True, draw final count arrays from Poisson distribution. Default: False
+    cospec : float or np.ndarray, optional
+        Real part of the cross spectrum (co-spectrum), Re[C].
+        - float: constant across all frequencies
+        - np.ndarray: frequency-dependent (same length as P1)
+        Cannot be specified together with gamma/lag.
+    quadspec : float or np.ndarray, optional
+        Imaginary part of the cross spectrum (quadrature spectrum), Im[C].
+        - float: constant across all frequencies
+        - np.ndarray: frequency-dependent (same length as P1)
+        Cannot be specified together with gamma/lag.
 
     Returns:
     --------
@@ -310,6 +351,27 @@ def TK_simulate(P1:np.ndarray,
         P2 = P1
     elif P1.shape != P2.shape:
         raise ValueError('Both power spectra must have the same shape!')
+
+    # Validate that cospec/quadspec and gamma/lag are not both specified
+    use_cross_spectra = cospec is not None or quadspec is not None
+    use_coh_lag = gamma is not None or lag is not None
+    if use_cross_spectra and use_coh_lag:
+        raise ValueError(
+            'Cannot specify both cospec/quadspec and gamma/lag. '
+            'Use one pair or the other.')
+
+    # Convert cospec/quadspec to gamma and lag
+    if use_cross_spectra:
+        pds_size = P1.size
+        if cospec is None:
+            cospec = np.zeros(pds_size)
+        elif isinstance(cospec, (float, int)):
+            cospec = np.ones(pds_size) * cospec
+        if quadspec is None:
+            quadspec = np.zeros(pds_size)
+        elif isinstance(quadspec, (float, int)):
+            quadspec = np.ones(pds_size) * quadspec
+        gamma, lag = cross_spectra_to_coh_lag(cospec, quadspec, P1, P2)
 
     pds_size = P1.size
 
@@ -437,7 +499,9 @@ class CLSimulator(Simulator):
                     pds2:Optional[Union[str,float,Model,Callable[[Iterable], Iterable]]],
                     params: Optional[Union[list,dict]] = None,
                     lag:Optional[Union[str,float,Model,Callable[[Iterable], Iterable],Iterable]]=None,
-                    coh:Optional[Union[str,float,Model,Callable[[Iterable], Iterable],Iterable]]=None)->Tuple[Lightcurve, Lightcurve]:
+                    coh:Optional[Union[str,float,Model,Callable[[Iterable], Iterable],Iterable]]=None,
+                    cospec:Optional[Union[float,Callable[[Iterable], Iterable],Iterable]]=None,
+                    quadspec:Optional[Union[float,Callable[[Iterable], Iterable],Iterable]]=None)->Tuple[Lightcurve, Lightcurve]:
         
         '''Simulate two LightCurves from a power spectrum and with a specified 
         phase lag and/or coherence distribution.
@@ -479,12 +543,26 @@ class CLSimulator(Simulator):
         
         coh (str | float | Model | Callable | Iterable, optional)
             - Defines the shape of the coherence spectrum used.
-            - If ommited, no coherence spectrum is simulated. 
+            - If ommited, no coherence spectrum is simulated.
             - If string, model defined in `stingray.simulator.models`
             - If float, is a constant value in [0,1]
             - If `astropy.modeling.Model`, coherence spectrum takes shape of model.
             - If other callable, has signature f(frequency)->coherence.
             - If iterable, must be coherence at each frequency in self.get_refftfreq()
+
+        cospec (float | Callable | Iterable, optional)
+            - Real part of the cross spectrum (co-spectrum).
+            - Cannot be specified together with coh/lag.
+            - If float, constant value across all frequencies.
+            - If callable, has signature f(frequency)->cospec.
+            - If iterable, must be value at each frequency in self.get_refftfreq()
+
+        quadspec (float | Callable | Iterable, optional)
+            - Imaginary part of the cross spectrum (quadrature spectrum).
+            - Cannot be specified together with coh/lag.
+            - If float, constant value across all frequencies.
+            - If callable, has signature f(frequency)->quadspec.
+            - If iterable, must be value at each frequency in self.get_refftfreq()
 
         Returns:
         --------
@@ -500,9 +578,15 @@ class CLSimulator(Simulator):
         '''
         if pds2 is None:
             pds2 = pds1
-        
+
         use_coh = coh is not None
         use_lag = lag is not None
+        use_cross_spectra = cospec is not None or quadspec is not None
+
+        if use_cross_spectra and (use_coh or use_lag):
+            raise ValueError(
+                'Cannot specify both cospec/quadspec and coh/lag. '
+                'Use one pair or the other.')
 
         w = self.get_refftfreq()
 
@@ -551,8 +635,28 @@ class CLSimulator(Simulator):
         else:
             pds_shape2 = pds2(w)
 
-        # If neither lag nor coh specified, fall back to stingray's simulate
-        if not use_lag and not use_coh:
+        # Parse cospec distribution
+        cospec_shape = None
+        if cospec is not None:
+            if isinstance(cospec, (float, int)):
+                cospec_shape = np.ones_like(w) * cospec
+            elif isinstance(cospec, Iterable):
+                cospec_shape = cospec
+            else:
+                cospec_shape = cospec(w)
+
+        # Parse quadspec distribution
+        quadspec_shape = None
+        if quadspec is not None:
+            if isinstance(quadspec, (float, int)):
+                quadspec_shape = np.ones_like(w) * quadspec
+            elif isinstance(quadspec, Iterable):
+                quadspec_shape = quadspec
+            else:
+                quadspec_shape = quadspec(w)
+
+        # If neither lag nor coh nor cross spectra specified, fall back to stingray's simulate
+        if not use_lag and not use_coh and not use_cross_spectra:
             if params is not None:
                 return self.simulate(pds1,params)
             else:
@@ -591,7 +695,9 @@ class CLSimulator(Simulator):
                               gamma = coh_shape,
                               red_noise = self.red_noise,
                               rms = self.rms,
-                              poisson=self.poisson)
+                              poisson=self.poisson,
+                              cospec=cospec_shape,
+                              quadspec=quadspec_shape)
             
         t = np.arange(len(c1)) * self.dt
         

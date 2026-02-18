@@ -16,6 +16,7 @@ from .simulations import (
     compute_transfer_function,
     compute_normalization_constant,
     compute_theoretical_std,
+    cross_spectra_to_coh_lag,
     make_powerlaw_pds,
     invert_fft,
     extract_and_scale,
@@ -30,6 +31,7 @@ __all__ = [
     "compute_transfer_function",
     "compute_normalization_constant",
     "compute_theoretical_std",
+    "cross_spectra_to_coh_lag",
     "make_powerlaw_pds",
     # Low-level utilities
     "invert_fft",
