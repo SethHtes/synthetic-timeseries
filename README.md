@@ -80,6 +80,20 @@ lc1, lc2 = sim.CL_simulate(pds1, pds2, lag=None, coh=None, segment_size=None)
   - `np.ndarray`: Frequency-dependent coherence
   - `callable`: Function f(frequency) → coherence
 
+- **cospec**: Co-spectrum (real part of the cross spectrum, Re[C]). Alternative to specifying coh/lag. Can be:
+  - `None`: Not used (default)
+  - `float`: Constant value across all frequencies
+  - `np.ndarray`: Frequency-dependent co-spectrum
+  - `callable`: Function f(frequency) → cospec
+
+- **quadspec**: Quadrature spectrum (imaginary part of the cross spectrum, Im[C]). Alternative to specifying coh/lag. Can be:
+  - `None`: Not used (default)
+  - `float`: Constant value across all frequencies
+  - `np.ndarray`: Frequency-dependent quadrature spectrum
+  - `callable`: Function f(frequency) → quadspec
+
+> **Note:** `cospec`/`quadspec` and `coh`/`lag` are mutually exclusive — specifying both will raise a `ValueError`.
+
 - **segment_size** (int): Segment size for experimental segmented simulation. Default: None
 
 **Returns:**
@@ -190,7 +204,32 @@ lc1, lc2 = sim.CL_simulate(pds1=power_spectrum, pds2=power_spectrum,
                            lag=0.5, coh=0.8)
 ```
 
-### Example 9: Adding Poisson Noise
+### Example 9: Using Co-spectrum and Quadrature Spectrum
+
+Instead of specifying coherence and phase lag, you can equivalently specify the real and imaginary parts of the cross spectrum directly:
+
+```python
+sim = CLSimulator(dt=0.01, N=10000, mean=100, rms=0.3)
+
+# Constant co-spectrum and quadrature spectrum
+lc1, lc2 = sim.CL_simulate(pds1=2.0, pds2=2.0, cospec=5.0, quadspec=2.0)
+
+# Frequency-dependent cross spectra via callables
+def cospec_func(freq):
+    return 3.0 * freq**(-2)
+
+def quadspec_func(freq):
+    return 1.5 * freq**(-2)
+
+lc1, lc2 = sim.CL_simulate(pds1=2.0, pds2=2.0,
+                            cospec=cospec_func, quadspec=quadspec_func)
+```
+
+These are converted internally to coherence and phase lag via:
+- γ² = (Re[C]² + Im[C]²) / (P_X · P_Y)
+- φ = arctan2(Im[C], Re[C])
+
+### Example 10: Adding Poisson Noise
 
 ```python
 # Simulate with Poisson noise for realistic photon counting statistics
@@ -265,6 +304,8 @@ counts1, counts2 = TK_simulate(
 - **rms** (float or tuple, optional): Fractional RMS variability. Default: 0.1
 - **P2** (np.ndarray, optional): Power spectrum of dependent time series. Default: P1
 - **poisson** (bool, optional): Apply Poisson noise. Default: False
+- **cospec** (float or np.ndarray, optional): Co-spectrum (Re[C]). Alternative to gamma/lag.
+- **quadspec** (float or np.ndarray, optional): Quadrature spectrum (Im[C]). Alternative to gamma/lag.
 
 **Returns:**
 - **counts1, counts2** (tuple of np.ndarray): Two correlated time series
@@ -291,6 +332,18 @@ from synthetic_timeseries.simulations import compute_normalization_constant
 
 # K = sqrt((P_Y - P_X*|T|²) / 2)
 K = compute_normalization_constant(P_X=P1, P_Y=P2, T=T)
+```
+
+#### cross_spectra_to_coh_lag()
+
+Converts co-spectrum and quadrature spectrum to coherence and phase lag.
+
+```python
+from synthetic_timeseries import cross_spectra_to_coh_lag
+
+# γ² = (Re[C]² + Im[C]²) / (P_X * P_Y)
+# φ  = arctan2(Im[C], Re[C])
+gamma2, phi = cross_spectra_to_coh_lag(cospec=co, quadspec=quad, P_X=P1, P_Y=P2)
 ```
 
 #### compute_theoretical_std()
