@@ -1,24 +1,25 @@
 import numpy as np
 from typing import Iterable, Tuple, Optional, Union, Callable, Literal
-from stingray import utils 
+from stingray import utils
 from stingray.simulator import Simulator
-from astropy.modeling import Model 
+from astropy.modeling import Model
 from stingray import Lightcurve, AveragedCrossspectrum
 
-def invert_fft(x:Iterable[complex],
-               mean: float,
-               nbins: int)->np.ndarray:
-    
+
+def invert_fft(x: Iterable[complex], mean: float, nbins: int) -> np.ndarray:
+
     f = np.hstack([mean * nbins, x])
 
-    return np.fft.irfft(f,n=nbins)
+    return np.fft.irfft(f, n=nbins)
 
 
-def compute_transfer_function(gamma2: Union[float, np.ndarray[float]],
-                              phi: Union[float, np.ndarray[float]],
-                              P_X: Union[float, np.ndarray[float]],
-                              P_Y: Union[float, np.ndarray[float]]) -> Union[complex, np.ndarray[complex]]:
-    '''Compute the transfer function T from coherence and phase lag.
+def compute_transfer_function(
+    gamma2: Union[float, np.ndarray[float]],
+    phi: Union[float, np.ndarray[float]],
+    P_X: Union[float, np.ndarray[float]],
+    P_Y: Union[float, np.ndarray[float]],
+) -> Union[complex, np.ndarray[complex]]:
+    """Compute the transfer function T from coherence and phase lag.
 
     Implements Equation 15 from Larner, Nowak, & Wilms (2026):
         T = sqrt(P_Y * γ² / P_X) * exp(i*φ)
@@ -48,15 +49,17 @@ def compute_transfer_function(gamma2: Union[float, np.ndarray[float]],
     References:
     -----------
     Larner, S. R., Nowak, M. A., & Wilms, J. 2026 (in prep)
-    '''
+    """
     magnitude = np.sqrt(P_Y * gamma2 / P_X)
     return magnitude * np.exp(1j * phi)
 
 
-def compute_normalization_constant(P_X: Union[float, np.ndarray[float]],
-                                   P_Y: Union[float, np.ndarray[float]],
-                                   T: Union[complex, np.ndarray[complex]]) -> Union[float, np.ndarray[float]]:
-    '''Compute the normalization constant K for the incoherent component.
+def compute_normalization_constant(
+    P_X: Union[float, np.ndarray[float]],
+    P_Y: Union[float, np.ndarray[float]],
+    T: Union[complex, np.ndarray[complex]],
+) -> Union[float, np.ndarray[float]]:
+    """Compute the normalization constant K for the incoherent component.
 
     Implements Equation 12 from Larner, Nowak, & Wilms (2026):
         K = sqrt((P_Y - P_X*|T|²) / 2)
@@ -84,16 +87,19 @@ def compute_normalization_constant(P_X: Union[float, np.ndarray[float]],
     References:
     -----------
     Larner, S. R., Nowak, M. A., & Wilms, J. 2026 (in prep)
-    '''
-    T_mag_squared = np.abs(T)**2
+    """
+    T_mag_squared = np.abs(T) ** 2
     # Clamp to zero to avoid NaN from floating-point rounding when gamma=1
     return np.sqrt(np.maximum(P_Y - P_X * T_mag_squared, 0.0) / 2)
 
-def cross_spectra_to_coh_lag(cospec: Union[float, np.ndarray],
-                             quadspec: Union[float, np.ndarray],
-                             P_X: Union[float, np.ndarray],
-                             P_Y: Union[float, np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
-    '''Convert co-spectrum and quadrature spectrum to coherence and phase lag.
+
+def cross_spectra_to_coh_lag(
+    cospec: Union[float, np.ndarray],
+    quadspec: Union[float, np.ndarray],
+    P_X: Union[float, np.ndarray],
+    P_Y: Union[float, np.ndarray],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Convert co-spectrum and quadrature spectrum to coherence and phase lag.
 
     Parameters:
     -----------
@@ -112,18 +118,19 @@ def cross_spectra_to_coh_lag(cospec: Union[float, np.ndarray],
         Coherence squared, γ² = (Re[C]² + Im[C]²) / (P_X * P_Y)
     phi : np.ndarray
         Phase lag in radians, φ = arctan2(Im[C], Re[C])
-    '''
+    """
     gamma2 = (cospec**2 + quadspec**2) / (P_X * P_Y)
     phi = np.arctan2(quadspec, cospec)
     return gamma2, phi
 
 
-def make_powerlaw_pds(index:float,dt:float,bins:int)->np.ndarray[float]:
+def make_powerlaw_pds(index: float, dt: float, bins: int) -> np.ndarray[float]:
     w = np.fft.rfftfreq(bins, d=dt)[1:]
 
-    p = np.power((1/w),index)
+    p = np.power((1 / w), index)
 
     return p
+
 
 def compute_theoretical_std(P: np.ndarray, N: int) -> float:
     """Compute the theoretical standard deviation of a time series from its PSD.
@@ -173,13 +180,16 @@ def compute_theoretical_std(P: np.ndarray, N: int) -> float:
 
     return np.sqrt(theoretical_var)
 
-def extract_and_scale(long_lc:np.ndarray,
-                       N:int,
-                       mean: float,
-                       red_noise:Optional[int] = 1,
-                       random_state:Optional[int] = None,
-                       rms:Optional[float] = 1.,
-                       theoretical_std:Optional[float]=None):
+
+def extract_and_scale(
+    long_lc: np.ndarray,
+    N: int,
+    mean: float,
+    red_noise: Optional[int] = 1,
+    random_state: Optional[int] = None,
+    rms: Optional[float] = 1.0,
+    theoretical_std: Optional[float] = None,
+):
     """
     i) Make a random cut and extract a light curve of required
     length.
@@ -226,10 +236,9 @@ def extract_and_scale(long_lc:np.ndarray,
         extract = random_state.randint(0, red_noise * N - N + 1)
         lc = np.take(long_lc, range(extract, extract + N))
 
-
     mean_lc = np.mean(lc)
 
-    use_target_mean = (theoretical_std is not None)
+    use_target_mean = theoretical_std is not None
 
     if use_target_mean and mean != 0:
         # Use target mean for centering (deterministic)
@@ -242,20 +251,22 @@ def extract_and_scale(long_lc:np.ndarray,
         else:
             return (lc - mean_lc) / std * mean * rms + mean
 
-def TK_simulate(P1:np.ndarray,
-                output_length:float,
-                dt:float,
-                mean:Union[float,Tuple[float,float]],
-                lag:Optional[Union[float,np.ndarray[float]]] = None,
-                gamma:Optional[Union[float,np.ndarray[float]]] = None,
-                red_noise:Optional[int] = 1,
-                rms:Optional[Union[float,Tuple[float,float]]] = 0.1,
-                P2:Optional[np.ndarray]=None,
-                poisson: bool = False,
-                cospec:Optional[Union[float,np.ndarray[float]]] = None,
-                quadspec:Optional[Union[float,np.ndarray[float]]] = None)->Tuple[np.ndarray[float],np.ndarray[float]]:
 
-    '''Simulate two correlated time series with arbitrary coherence and phase lag.
+def TK_simulate(
+    P1: np.ndarray,
+    output_length: float,
+    dt: float,
+    mean: Union[float, Tuple[float, float]],
+    lag: Optional[Union[float, np.ndarray[float]]] = None,
+    gamma: Optional[Union[float, np.ndarray[float]]] = None,
+    red_noise: Optional[int] = 1,
+    rms: Optional[Union[float, Tuple[float, float]]] = 0.1,
+    P2: Optional[np.ndarray] = None,
+    poisson: bool = False,
+    cospec: Optional[Union[float, np.ndarray[float]]] = None,
+    quadspec: Optional[Union[float, np.ndarray[float]]] = None,
+) -> Tuple[np.ndarray[float], np.ndarray[float]]:
+    """Simulate two correlated time series with arbitrary coherence and phase lag.
 
     Implements the method from Larner, Nowak, & Wilms (2026) using Equations 9, 10,
     12, and 15. The reference time series is generated using the Timmer-Koenig method,
@@ -345,20 +356,21 @@ def TK_simulate(P1:np.ndarray,
     -----------
     Larner, S. R., Nowak, M. A., & Wilms, J. 2026 (in prep)
     Timmer, J., & Koenig, M. 1995, A&A, 300, 707
-    '''
+    """
 
     if P2 is None:
         P2 = P1
     elif P1.shape != P2.shape:
-        raise ValueError('Both power spectra must have the same shape!')
+        raise ValueError("Both power spectra must have the same shape!")
 
     # Validate that cospec/quadspec and gamma/lag are not both specified
     use_cross_spectra = cospec is not None or quadspec is not None
     use_coh_lag = gamma is not None or lag is not None
     if use_cross_spectra and use_coh_lag:
         raise ValueError(
-            'Cannot specify both cospec/quadspec and gamma/lag. '
-            'Use one pair or the other.')
+            "Cannot specify both cospec/quadspec and gamma/lag. "
+            "Use one pair or the other."
+        )
 
     # Convert cospec/quadspec to gamma and lag
     if use_cross_spectra:
@@ -387,9 +399,9 @@ def TK_simulate(P1:np.ndarray,
     elif isinstance(gamma, (float, int)):
         gamma = np.ones(pds_size) * gamma
 
-    randint = np.random.randint(low=0,high=10000)
+    randint = np.random.randint(low=0, high=10000)
 
-    N = int(output_length/dt)
+    N = int(output_length / dt)
     long_N = int(output_length * red_noise / dt)
 
     # Generate random variables (one set per frequency)
@@ -426,14 +438,26 @@ def TK_simulate(P1:np.ndarray,
 
     # Inverse FFT to get time series
     counts1 = invert_fft(X, mean=mean, nbins=long_N)
-    counts1 = extract_and_scale(long_lc=counts1, N=N, red_noise=red_noise,
-                                rms=rms1, random_state=randint, mean=mean,
-                                theoretical_std=theoretical_std_X)
+    counts1 = extract_and_scale(
+        long_lc=counts1,
+        N=N,
+        red_noise=red_noise,
+        rms=rms1,
+        random_state=randint,
+        mean=mean,
+        theoretical_std=theoretical_std_X,
+    )
 
     counts2 = invert_fft(Y, mean=mean, nbins=long_N)
-    counts2 = extract_and_scale(long_lc=counts2, N=N, red_noise=red_noise,
-                                rms=rms2, random_state=randint, mean=mean,
-                                theoretical_std=theoretical_std_Y)
+    counts2 = extract_and_scale(
+        long_lc=counts2,
+        N=N,
+        red_noise=red_noise,
+        rms=rms2,
+        random_state=randint,
+        mean=mean,
+        theoretical_std=theoretical_std_Y,
+    )
 
     if poisson:
         counts1 = np.random.poisson(counts1)
@@ -444,10 +468,10 @@ def TK_simulate(P1:np.ndarray,
 
 class CLSimulator(Simulator):
     """
-    Methods to simulate and visualize light curves with arbitrary coherence 
-    and phase lag distributions.  
-    
-    Built on top of the `stingray.simulator.Simulator` implementation. 
+    Methods to simulate and visualize light curves with arbitrary coherence
+    and phase lag distributions.
+
+    Built on top of the `stingray.simulator.Simulator` implementation.
 
     Parameters
     ----------
@@ -458,8 +482,8 @@ class CLSimulator(Simulator):
     mean : float, default 0
         mean value of the simulated light curve
     rms : float, default 1
-        Fractional root mean square of the output lightcurves. If float, same 
-        RMS is used for both bands. If tuple (rms1, rms2), different RMS for 
+        Fractional root mean square of the output lightcurves. If float, same
+        RMS is used for both bands. If tuple (rms1, rms2), different RMS for
         each band. Default is 1.
     err : float, default 0
         the errorbars on the final light curve
@@ -476,40 +500,49 @@ class CLSimulator(Simulator):
         try:
             super().__init__(*args, **kwargs)
         except TypeError as e:
-            if "'<=' not supported between instances of 'tuple' and 'int'" not in str(e):
+            if "'<=' not supported between instances of 'tuple' and 'int'" not in str(
+                e
+            ):
                 raise e
 
     def get_refftfreq(self) -> np.ndarray:
         """
         Calculate the positive frequencies for the real-valued FFT of a signal.
 
-        This method computes the frequencies corresponding to the positive 
-        half of the discrete Fourier Transform (DFT) of a signal, based on 
+        This method computes the frequencies corresponding to the positive
+        half of the discrete Fourier Transform (DFT) of a signal, based on
         the parameters of the red noise and the number of samples.
 
         Returns:
-            np.ndarray: An array of positive frequency values corresponding 
+            np.ndarray: An array of positive frequency values corresponding
             to the real FFT of the signal.
         """
-        
-        return np.fft.rfftfreq(self.red_noise * self.N, d = self.dt)[1:]
 
-    def CL_simulate(self,
-                    pds1:Union[str,float,Model,Callable[[Iterable], Iterable]],
-                    pds2:Optional[Union[str,float,Model,Callable[[Iterable], Iterable]]],
-                    params: Optional[Union[list,dict]] = None,
-                    lag:Optional[Union[str,float,Model,Callable[[Iterable], Iterable],Iterable]]=None,
-                    coh:Optional[Union[str,float,Model,Callable[[Iterable], Iterable],Iterable]]=None,
-                    cospec:Optional[Union[float,Callable[[Iterable], Iterable],Iterable]]=None,
-                    quadspec:Optional[Union[float,Callable[[Iterable], Iterable],Iterable]]=None)->Tuple[Lightcurve, Lightcurve]:
-        
-        '''Simulate two LightCurves from a power spectrum and with a specified 
+        return np.fft.rfftfreq(self.red_noise * self.N, d=self.dt)[1:]
+
+    def CL_simulate(
+        self,
+        pds1: Union[str, float, Model, Callable[[Iterable], Iterable]],
+        pds2: Optional[Union[str, float, Model, Callable[[Iterable], Iterable]]],
+        params: Optional[Union[list, dict]] = None,
+        lag: Optional[
+            Union[str, float, Model, Callable[[Iterable], Iterable], Iterable]
+        ] = None,
+        coh: Optional[
+            Union[str, float, Model, Callable[[Iterable], Iterable], Iterable]
+        ] = None,
+        cospec: Optional[Union[float, Callable[[Iterable], Iterable], Iterable]] = None,
+        quadspec: Optional[
+            Union[float, Callable[[Iterable], Iterable], Iterable]
+        ] = None,
+    ) -> Tuple[Lightcurve, Lightcurve]:
+        """Simulate two LightCurves from a power spectrum and with a specified
         phase lag and/or coherence distribution.
-        
+
         Parameters:
         -----------
         pds1 (str | float| Model | Callable | Iterable)
-            - Defines the shape of the power spectrum used to simulate the 
+            - Defines the shape of the power spectrum used to simulate the
             reference time series:
             - If string, model defined in `stingray.simulator.models`.
             - If float, defines the index of a power law power spectrum.
@@ -518,29 +551,29 @@ class CLSimulator(Simulator):
             - If iterable, defines the power spectrum at each frequency in self.get_rfftfreq()
 
         pds2 (str | float| Model | Callable | Iterable, optional)
-            - Defines the shape of the power spectrum used to simulate the 
+            - Defines the shape of the power spectrum used to simulate the
             dependent time series:
             - If string, model defined in `stingray.simulator.models`.
             - If float, defines the index of a power law power spectrum.
             - If `astropy.modeling.Model`, power spectrum takes shape of model.
             - If other callable, has signature f(frequency)->pds.
             - If iterable, defines the power spectrum at each frequency in self.get_rfftfreq().
-            - If not given, is set to pds1. 
+            - If not given, is set to pds1.
             - Cannot be given if simulating time series only with phase lag,
             only pds1 will be used.
-             
+
         params (list | dict, optional)
             - Parameters for use in predefined model string.
-        
+
         lag (str | float | Model | Callable | Iterable, optional)
-            - Defines the shape of the phase lag spectrum used. 
+            - Defines the shape of the phase lag spectrum used.
             - If ommited, no phase lag spectrum is simulated.
             - If string, model defined in `stingray.simulator.models`
             - If float, is a constant value in [-π,π]
             - If `astropy.modeling.Model`, lag spectrum takes shape of model.
             - If other callable, has signature f(frequency)->lag.
             - If iterable, must be lag at each frequency in self.get_refftfreq()
-        
+
         coh (str | float | Model | Callable | Iterable, optional)
             - Defines the shape of the coherence spectrum used.
             - If ommited, no coherence spectrum is simulated.
@@ -567,7 +600,7 @@ class CLSimulator(Simulator):
         Returns:
         --------
         (lc1, lc2):
-            - Tuple of `Lightcurves` representing the input and response light 
+            - Tuple of `Lightcurves` representing the input and response light
             curves, respectively.
 
         Raises:
@@ -575,7 +608,7 @@ class CLSimulator(Simulator):
         ValueError:
             - If using a model string and model or parameters cannot be parsed.
 
-        '''
+        """
         if pds2 is None:
             pds2 = pds1
 
@@ -585,26 +618,27 @@ class CLSimulator(Simulator):
 
         if use_cross_spectra and (use_coh or use_lag):
             raise ValueError(
-                'Cannot specify both cospec/quadspec and coh/lag. '
-                'Use one pair or the other.')
+                "Cannot specify both cospec/quadspec and coh/lag. "
+                "Use one pair or the other."
+            )
 
         w = self.get_refftfreq()
 
         # Inspect the input and generate...
         # pds_distribution 1
-        if isinstance(pds1, (float,int)):
-            pds_shape1 = make_powerlaw_pds(pds1,self.dt,self.red_noise*self.N)
+        if isinstance(pds1, (float, int)):
+            pds_shape1 = make_powerlaw_pds(pds1, self.dt, self.red_noise * self.N)
 
         elif isinstance(pds1, str):
             from stingray.simulator import models
 
             if not hasattr(models, pds1):
-                raise ValueError('Model string not defined')
+                raise ValueError("Model string not defined")
 
             if isinstance(params, dict):
                 model = getattr(models, pds1)(**params)
                 pds_shape1 = model(w)
-            elif isinstance(params,list):
+            elif isinstance(params, list):
                 model_func = getattr(models, pds1)
                 pds_shape1 = model_func(w, params)
             else:
@@ -614,19 +648,19 @@ class CLSimulator(Simulator):
             pds_shape1 = pds1(w)
 
         # pds distribution 2
-        if isinstance(pds2, (float,int)):
-            pds_shape2 = make_powerlaw_pds(pds2,self.dt,self.red_noise*self.N)
+        if isinstance(pds2, (float, int)):
+            pds_shape2 = make_powerlaw_pds(pds2, self.dt, self.red_noise * self.N)
 
         elif isinstance(pds2, str):
             from stingray.simulator import models
 
             if not hasattr(models, pds2):
-                raise ValueError('Model string not defined')
+                raise ValueError("Model string not defined")
 
             if isinstance(params, dict):
                 model = getattr(models, pds2)(**params)
                 pds_shape2 = model(w)
-            elif isinstance(params,list):
+            elif isinstance(params, list):
                 model_func = getattr(models, pds2)
                 pds_shape2 = model_func(w, params)
             else:
@@ -658,18 +692,18 @@ class CLSimulator(Simulator):
         # If neither lag nor coh nor cross spectra specified, fall back to stingray's simulate
         if not use_lag and not use_coh and not use_cross_spectra:
             if params is not None:
-                return self.simulate(pds1,params)
+                return self.simulate(pds1, params)
             else:
                 return self.simulate(pds1)
 
         # Parse lag distribution
         lag_shape = None
         if use_lag:
-            if isinstance(lag, (float,int)):
+            if isinstance(lag, (float, int)):
                 lag_shape = np.ones_like(w) * lag
             elif isinstance(lag, str):
-                raise NotImplementedError('Model strings not implemented')
-            elif isinstance(lag,Iterable):
+                raise NotImplementedError("Model strings not implemented")
+            elif isinstance(lag, Iterable):
                 lag_shape = lag
             else:
                 lag_shape = lag(w)
@@ -677,39 +711,50 @@ class CLSimulator(Simulator):
         # Parse coh distribution
         coh_shape = None
         if use_coh:
-            if isinstance(coh, (float,int)):
+            if isinstance(coh, (float, int)):
                 coh_shape = np.ones_like(w) * coh
             elif isinstance(coh, str):
-                raise NotImplementedError('Model strings not implemented')
-            elif isinstance(coh,Iterable):
+                raise NotImplementedError("Model strings not implemented")
+            elif isinstance(coh, Iterable):
                 coh_shape = coh
             else:
                 coh_shape = coh(w)
 
-        c1, c2 = TK_simulate(P1 = pds_shape1,
-                              P2 = pds_shape2,
-                              output_length=self.N * self.dt,
-                              dt = self.dt,
-                              mean = self.mean,
-                              lag = lag_shape,
-                              gamma = coh_shape,
-                              red_noise = self.red_noise,
-                              rms = self.rms,
-                              poisson=self.poisson,
-                              cospec=cospec_shape,
-                              quadspec=quadspec_shape)
-            
+        c1, c2 = TK_simulate(
+            P1=pds_shape1,
+            P2=pds_shape2,
+            output_length=self.N * self.dt,
+            dt=self.dt,
+            mean=self.mean,
+            lag=lag_shape,
+            gamma=coh_shape,
+            red_noise=self.red_noise,
+            rms=self.rms,
+            poisson=self.poisson,
+            cospec=cospec_shape,
+            quadspec=quadspec_shape,
+        )
+
         t = np.arange(len(c1)) * self.dt
-        
-        lc1 = Lightcurve(time=t, counts = c1, err = np.zeros_like(c1), dt = self.dt,skip_checks=True)
-        lc2 = Lightcurve(time=t, counts = c2, err = np.zeros_like(c2), dt = self.dt,skip_checks=True)
-        
-        return (lc1,lc2)
-    
+
+        lc1 = Lightcurve(
+            time=t, counts=c1, err=np.zeros_like(c1), dt=self.dt, skip_checks=True
+        )
+        lc2 = Lightcurve(
+            time=t, counts=c2, err=np.zeros_like(c2), dt=self.dt, skip_checks=True
+        )
+
+        return (lc1, lc2)
+
     @staticmethod
-    def crossspectrum(lc1:Lightcurve, lc2:Lightcurve, seg_size:Optional[float] = None, norm:Optional[Literal['frac', 'abs', 'leahy', 'none']] = 'frac')->np.ndarray:
-        '''
-        Make a cross spectrum of the simulated light curves. 
+    def crossspectrum(
+        lc1: Lightcurve,
+        lc2: Lightcurve,
+        seg_size: Optional[float] = None,
+        norm: Optional[Literal["frac", "abs", "leahy", "none"]] = "frac",
+    ) -> np.ndarray:
+        """
+        Make a cross spectrum of the simulated light curves.
 
         Parameters
         ----------
@@ -730,13 +775,11 @@ class CLSimulator(Simulator):
         Notes:
         -----
         lc1 and lc2 must be the same length.
-        '''
+        """
 
-        # Following stingray convention by including this method 
+        # Following stingray convention by including this method
 
         if seg_size is None:
             seg_size = lc1.tseg
 
-        return AveragedCrossspectrum(lc1,lc2,seg_size,silent=True,norm=norm).power
-
-
+        return AveragedCrossspectrum(lc1, lc2, seg_size, silent=True, norm=norm).power

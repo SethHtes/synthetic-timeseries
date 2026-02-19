@@ -86,13 +86,15 @@ class TestTKSimulateWithCrossSpectra:
 
     def test_error_when_both_specified(self):
         """Should raise ValueError when both coh/lag and cospec/quadspec given."""
-        with pytest.raises(ValueError, match='Cannot specify both'):
-            TK_simulate(self.P1, self.output_length, self.dt, mean=100,
-                        gamma=0.8, cospec=1.0)
+        with pytest.raises(ValueError, match="Cannot specify both"):
+            TK_simulate(
+                self.P1, self.output_length, self.dt, mean=100, gamma=0.8, cospec=1.0
+            )
 
-        with pytest.raises(ValueError, match='Cannot specify both'):
-            TK_simulate(self.P1, self.output_length, self.dt, mean=100,
-                        lag=0.5, quadspec=1.0)
+        with pytest.raises(ValueError, match="Cannot specify both"):
+            TK_simulate(
+                self.P1, self.output_length, self.dt, mean=100, lag=0.5, quadspec=1.0
+            )
 
     def test_cospec_quadspec_produces_output(self):
         """Basic smoke test: cospec/quadspec should produce valid output."""
@@ -103,9 +105,15 @@ class TestTKSimulateWithCrossSpectra:
         cospec = C_mag * np.cos(phi)
         quadspec = C_mag * np.sin(phi)
 
-        c1, c2 = TK_simulate(self.P1, self.output_length, self.dt,
-                              mean=100, P2=self.P2,
-                              cospec=cospec, quadspec=quadspec)
+        c1, c2 = TK_simulate(
+            self.P1,
+            self.output_length,
+            self.dt,
+            mean=100,
+            P2=self.P2,
+            cospec=cospec,
+            quadspec=quadspec,
+        )
 
         assert c1.shape == (self.N,)
         assert c2.shape == (self.N,)
@@ -119,16 +127,18 @@ class TestTKSimulateWithCrossSpectra:
         cospec = C_mag  # All real -> zero phase lag
 
         np.random.seed(42)
-        c1_cross, c2_cross = TK_simulate(self.P1, self.output_length, self.dt,
-                                          mean=100, P2=self.P2, cospec=cospec)
+        c1_cross, c2_cross = TK_simulate(
+            self.P1, self.output_length, self.dt, mean=100, P2=self.P2, cospec=cospec
+        )
 
         assert c1_cross.shape == (self.N,)
         assert c2_cross.shape == (self.N,)
 
     def test_scalar_cospec_quadspec(self):
         """Float inputs for cospec/quadspec should work."""
-        c1, c2 = TK_simulate(self.P1, self.output_length, self.dt,
-                              mean=100, cospec=1.0, quadspec=0.5)
+        c1, c2 = TK_simulate(
+            self.P1, self.output_length, self.dt, mean=100, cospec=1.0, quadspec=0.5
+        )
 
         assert c1.shape == (self.N,)
         assert c2.shape == (self.N,)
@@ -140,9 +150,15 @@ class TestTKSimulateWithCrossSpectra:
 
         # Use coh/lag directly
         np.random.seed(123)
-        c1_cl, c2_cl = TK_simulate(self.P1, self.output_length, self.dt,
-                                     mean=100, P2=self.P2,
-                                     gamma=gamma2, lag=phi)
+        c1_cl, c2_cl = TK_simulate(
+            self.P1,
+            self.output_length,
+            self.dt,
+            mean=100,
+            P2=self.P2,
+            gamma=gamma2,
+            lag=phi,
+        )
 
         # Compute equivalent cross spectra
         C_mag = np.sqrt(gamma2 * self.P1 * self.P2)
@@ -150,9 +166,15 @@ class TestTKSimulateWithCrossSpectra:
         quadspec = C_mag * np.sin(phi)
 
         np.random.seed(123)
-        c1_cs, c2_cs = TK_simulate(self.P1, self.output_length, self.dt,
-                                     mean=100, P2=self.P2,
-                                     cospec=cospec, quadspec=quadspec)
+        c1_cs, c2_cs = TK_simulate(
+            self.P1,
+            self.output_length,
+            self.dt,
+            mean=100,
+            P2=self.P2,
+            cospec=cospec,
+            quadspec=quadspec,
+        )
 
         np.testing.assert_allclose(c1_cl, c1_cs, rtol=1e-10)
         np.testing.assert_allclose(c2_cl, c2_cs, rtol=1e-10)
@@ -166,23 +188,23 @@ class TestCLSimulateWithCrossSpectra:
 
     def test_error_when_both_specified(self):
         """Should raise ValueError when both coh/lag and cospec/quadspec given."""
-        with pytest.raises(ValueError, match='Cannot specify both'):
+        with pytest.raises(ValueError, match="Cannot specify both"):
             self.sim.CL_simulate(pds1=2.0, pds2=2.0, coh=0.8, cospec=1.0)
 
-        with pytest.raises(ValueError, match='Cannot specify both'):
+        with pytest.raises(ValueError, match="Cannot specify both"):
             self.sim.CL_simulate(pds1=2.0, pds2=2.0, lag=0.5, quadspec=1.0)
 
     def test_constant_cospec_quadspec(self):
         """Constant float cospec/quadspec should work."""
-        lc1, lc2 = self.sim.CL_simulate(pds1=2.0, pds2=2.0,
-                                          cospec=1.0, quadspec=0.5)
+        lc1, lc2 = self.sim.CL_simulate(pds1=2.0, pds2=2.0, cospec=1.0, quadspec=0.5)
         assert len(lc1.counts) == 4096
         assert len(lc2.counts) == 4096
 
     def test_callable_cospec_quadspec(self):
         """Callable cospec/quadspec should work."""
         lc1, lc2 = self.sim.CL_simulate(
-            pds1=2.0, pds2=2.0,
+            pds1=2.0,
+            pds2=2.0,
             cospec=lambda f: np.ones_like(f) * 2.0,
             quadspec=lambda f: np.ones_like(f) * 1.0,
         )
@@ -194,8 +216,9 @@ class TestCLSimulateWithCrossSpectra:
         cospec_arr = np.ones_like(w) * 3.0
         quadspec_arr = np.ones_like(w) * 1.5
 
-        lc1, lc2 = self.sim.CL_simulate(pds1=2.0, pds2=2.0,
-                                          cospec=cospec_arr, quadspec=quadspec_arr)
+        lc1, lc2 = self.sim.CL_simulate(
+            pds1=2.0, pds2=2.0, cospec=cospec_arr, quadspec=quadspec_arr
+        )
         assert len(lc1.counts) == 4096
 
     def test_cospec_only_no_quadspec(self):
